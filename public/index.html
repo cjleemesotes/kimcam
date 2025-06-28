@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<title>ProofCam – every frame, provable truth</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="ProofCam anchors and verifies claim videos on‑chain in under a second.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232196F3%22><path d=%22M6 4h12v16H6z%22 stroke=%22white%22 stroke-width=%222%22/><path d=%22M8 12l8-5v10z%22 fill=%22white%22/></svg>">
+
+<!-- Alpine.js + Tailwind 3 CDN -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        navy:'#0E1A2B',
+        brand:'#2196F3',
+        danger:'#E53935',
+        money:'#0CE16F'
+      },
+      fontFamily: { sans:['Inter', 'sans-serif'] }
+    }
+  }
+}
+</script>
+<style>
+/* subtle card elevation */
+.card{background-color:#162033;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+/* remove default file input */
+input[type="file"]::file-selector-button{display:none}
+</style>
+</head>
+
+<body class="h-full bg-navy text-white text-[15px] font-sans">
+<main x-data="app()" class="h-full flex flex-col items-center py-10">
+
+  <!-- Hero -->
+  <header class="text-center space-y-2 mb-12">
+    <h1 class="text-5xl font-extrabold tracking-tight">Every frame, provable truth.</h1>
+    <p class="text-brand/80">Anchor claim videos to blockchain in &lt;1 second.</p>
+  </header>
+
+  <!-- Layout -->
+  <div class="w-full max-w-5xl grid md:grid-cols-[1fr_300px] gap-8">
+
+    <!-- Wizard -->
+    <section class="space-y-8">
+
+      <!-- STEP 1 — Anchor -->
+      <div x-show="stage===1" x-transition.opacity.duration.300ms class="card p-8">
+        <h2 class="text-xl font-semibold mb-6">1&nbsp;· Anchor new evidence</h2>
+
+        <label for="anchor-file"
+               class="relative flex flex-col items-center justify-center h-28 border-2 border-dashed border-brand/40 rounded cursor-pointer hover:border-brand">
+          <input id="anchor-file" type="file" accept="video/*" class="absolute inset-0 opacity-0"
+                 @change="file=$event.target.files[0]">
+          <span x-text="file?file.name:'Click to choose video'" class="truncate px-4"></span>
+        </label>
+
+        <button @click="anchor" :disabled="!file||busy"
+                class="w-full mt-6 py-3 rounded font-medium bg-brand hover:bg-brand/90 disabled:opacity-30 flex items-center justify-center gap-2">
+          <template x-if="!busy">Anchor → NEAR</template>
+          <span x-show="busy" class="animate-spin h-5 w-5 border-2 border-white/50 border-t-transparent rounded-full"></span>
+        </button>
+      </div>
+
+      <!-- STEP 1 collapsed bar -->
+      <div x-show="stage>1" x-transition.opacity class="card p-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand">✓</span>
+          <span class="text-sm">Anchored</span>
+        </div>
+        <button @click="copyId" class="text-xs font-mono bg-white/10 px-2 py-1 rounded hover:bg-white/20" x-text="anchorId"></button>
+      </div>
+
+      <!-- STEP 2 — Verify -->
+      <div x-show="stage===2" x-transition.opacity.duration.300ms class="card p-8">
+        <h2 class="text-xl font-semibold mb-6">2&nbsp;· Verify authenticity</h2>
+
+        <input x-model="verifyId" placeholder="Anchor ID"
+               class="w-full bg-white/10 p-3 rounded focus:outline-none focus:ring-2 focus:ring-brand mb-4">
+
+        <label for="verify-file"
+               class="relative flex flex-col items-center justify-center h-24 border-2 border-dashed border-brand/40 rounded cursor-pointer hover:border-brand">
+          <input id="verify-file" type="file" accept="video/*" class="absolute inset-0 opacity-0"
+                 @change="fileVerify=$event.target.files[0]">
+          <span x-text="fileVerify?fileVerify.name:'Choose video to verify'" class="truncate px-4"></span>
+        </label>
+
+        <button @click="verify" :disabled="!verifyReady||busy"
+                class="w-full mt-6 py-3 rounded font-medium bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 flex items-center justify-center gap-2">
+          <span x-show="!busy">Verify ✓</span>
+          <span x-show="busy" class="animate-spin h-5 w-5 border-2 border-white/50 border-t-transparent rounded-full"></span>
+        </button>
+
+        <template x-if="verifyMsg">
+          <p class="mt-6 text-lg font-semibold"
+             :class="verifyOk?'text-money':'text-danger'"
+             x-text="verifyMsg"></p>
+        </template>
+      </div>
+
+    </section>
+
+    <!-- Meter -->
+    <aside class="card p-8 flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-semibold mb-4">Fraud Savings</h3>
+        <p class="text-sm text-white/70 leading-relaxed">
+          Each verified video protects an average <strong>\$2 000</strong> payout.<br>
+          (Demo metric)
+        </p>
+      </div>
+      <div class="text-center">
+        <p class="text-white/70 text-sm">Protected so far</p>
+        <p class="text-5xl font-extrabold text-brand" x-text="formattedSavings()">$0</p>
+        <p class="text-xs mt-1" x-text="`${validatedCount} videos`"></p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast" x-text="toast" x-transition.opacity
+       class="fixed bottom-6 right-6 bg-danger px-4 py-2 rounded shadow-lg cursor-pointer text-sm"
+       @click="toast=''" role="alert"></div>
+
+</main>
+
+<script>
+const USD_PER_VIDEO = 2000;
+
+function app(){
+  return{
+    /* state */
+    stage:1, file:null,fileVerify:null,busy:false,
+    anchorId:'',verifyId:'',verifyMsg:'',verifyOk:false,
+    validatedCount:0,saved:0,toast:'',
+
+    /* derived */
+    get verifyReady(){return this.verifyId.trim()&&this.fileVerify},
+
+    /* actions */
+    async anchor(){
+      if(this.busy) return;
+      try{
+        this.busy=true; this.toast='';
+        const form=new FormData(); form.append('video',this.file);
+        const r=await fetch('/process-video',{method:'POST',body:form});
+        if(!r.ok) throw new Error(await r.text());
+        const {id}=await r.json();
+        this.anchorId=id; this.verifyId=id;
+        this.stage=2;
+      }catch(e){this.toast=e.message}
+      finally{this.busy=false}
+    },
+    async verify(){
+      if(this.busy) return;
+      try{
+        this.busy=true; this.toast='';
+        const form=new FormData();
+        form.append('id',this.verifyId.trim());
+        form.append('video',this.fileVerify);
+        const r=await fetch('/verify-video',{method:'POST',body:form});
+        if(!r.ok) throw new Error(await r.text());
+        const {ok}=await r.json();
+        this.verifyOk=ok;
+        this.verifyMsg = ok? 'Fingerprint match — authentic' : 'Mismatch — file altered';
+        if(ok){
+          this.validatedCount++;
+          this.saved += USD_PER_VIDEO;
+        }
+      }catch(e){this.toast=e.message}
+      finally{this.busy=false}
+    },
+
+    /* helpers */
+    copyId(){navigator.clipboard.writeText(this.anchorId); this.toast='ID copied';},
+    formattedSavings(){return `$${this.saved.toLocaleString('en-US')}`}
+  }
+}
+</script>
+</body>
+</html>

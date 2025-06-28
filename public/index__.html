@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>ProofCam ▸ NEAR Demo</title>
+
+  <!-- Alpine.js: tiny reactive layer -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Tailwind (CDN) for quick styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+<div x-data="ui()" class="max-w-xl mx-auto p-6 space-y-8">
+
+  <h1 class="text-2xl font-bold">ProofCam → NEAR Merkle Demo</h1>
+
+  <!-- ── Anchor ───────────────────────────────────────────── -->
+  <section class="p-4 bg-white rounded shadow">
+    <h2 class="font-semibold mb-2">1. Anchor</h2>
+
+    <input type="file" accept="video/*" x-ref="file" class="mb-2">
+    <button class="px-4 py-1 bg-blue-600 text-white rounded"
+            @click="anchor" :disabled="busy">
+      <template x-if="!busy">Anchor</template>
+      <template x-if="busy">⏳</template>
+    </button>
+
+    <template x-if="videoId">
+      <p class="mt-3 text-green-700">
+        ✔ Video ID:
+        <code class="bg-gray-100 px-1 py-0.5 text-xs" x-text="videoId"></code>
+      </p>
+    </template>
+  </section>
+
+  <!-- ── Verify ────────────────────────────────────────────── -->
+  <section class="p-4 bg-white rounded shadow">
+    <h2 class="font-semibold mb-2">2. Verify</h2>
+
+    <input x-model="verifyId" placeholder="Paste video ID"
+           class="border p-1 w-full mb-2">
+    <input type="file" accept="video/*" x-ref="fileVerify" class="mb-2">
+
+    <button class="px-4 py-1 bg-green-600 text-white rounded"
+            @click="verify" :disabled="busy">
+      Verify
+    </button>
+
+    <template x-if="verifyMsg">
+      <p class="mt-3 font-semibold"
+         :class="verifyOk ? 'text-green-600' : 'text-red-600'"
+         x-text="verifyMsg">
+      </p>
+    </template>
+  </section>
+
+  <!-- generic error -->
+  <template x-if="error">
+    <p class="text-red-600 font-semibold" x-text="error"></p>
+  </template>
+
+</div>
+
+<script>
+function ui () {
+  const POST = (url, body) =>
+    fetch(url, { method:'POST', body })
+      .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t) }));
+
+  return {
+    busy:false, error:'', videoId:'', verifyId:'', verifyMsg:'', verifyOk:false,
+
+    async anchor () {
+      this.reset(); this.busy = true;
+      try {
+        const file = this.$refs.file.files[0];
+        if (!file) throw new Error('choose a video first');
+        const body = new FormData(); body.append('video', file);
+        const { videoId } = await POST('/process-video', body);
+        this.videoId = videoId;
+        this.verifyId = videoId;            // convenience: pre‑fill field
+      } catch (e) { this.error = e.message }
+      finally     { this.busy = false }
+    },
+
+    async verify () {
+      this.error=''; this.verifyMsg=''; this.busy = true;
+      try {
+        const file = this.$refs.fileVerify.files[0];
+        if (!file) throw new Error('pick the video to verify');
+        const body = new FormData();
+        body.append('videoId', this.verifyId.trim());
+        body.append('video',   file);
+        const { ok } = await POST('/verify-video', body);
+        this.verifyOk  = ok;
+        this.verifyMsg = ok ? '✓ hash matches' : '✗ mismatch';
+      } catch (e) { this.error = e.message }
+      finally     { this.busy = false }
+    },
+
+    reset () { this.error=''; this.videoId=''; this.verifyMsg=''; }
+  }
+}
+</script>
+</body>
+</html>

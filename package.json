@@ -1,12 +1,16 @@
 {
-  "name": "registry-contract",
+  "name": "hash-registry",
   "version": "1.0.0",
+  "description": "Minimal video‑proof MVP: Merkle‑hash frames, anchor on NEAR, verify with CLI.",
   "type": "module",
+  "private": true,
   "scripts": {
-    "build:wasm": "near-sdk-js build src/contract.ts build/registry.wasm",
+    "build:wasm": "near-sdk-js build contract/contract.ts build/registry.wasm",
     "build:cli": "tsc -p tsconfig.cli.json",
+    "start": "node server.cjs",
     "build": "npm run build:wasm && npm run build:cli",
-    "test": "npm run build && ava"
+    "pretest": "npm run build",
+    "test": "ava"
   },
   "bin": {
     "hash-cli": "dist/cli/cli.js"
@@ -19,13 +23,27 @@
     "@near-js/signers": "^2.1.0",
     "blake3": "^2.1.6",
     "chalk": "^5.4.1",
-    "commander": "^11.1.0"
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "ethereum-cryptography": "1.2.0",
+    "express": "^4.19.2",
+    "ffmpeg-static": "^5.1.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "hash-wasm": "^4.12.0",
+    "keccak": "^3.0.4",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "0.5.1",
+    "multer": "^1.4.5-lts.1",
+    "near-api-js": "^6.1.0",
+    "tmp": "^0.2.3"
   },
   "devDependencies": {
-    "@types/node": "^24.0.6",
+    "@types/node": "^20.11.19",
     "ava": "^5.3.1",
-    "hash-wasm": "^4.12.0",
     "near-sdk-js": "^2.0.0",
     "typescript": "^4.9.5"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

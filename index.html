@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8" />
+<title>Hash-Registry GUI (testnet)</title>
+<style>
+ body{font-family:system-ui,sans-serif;margin:2rem;max-width:42rem}
+ fieldset{border:1px solid #ccc;padding:1rem;margin-bottom:2rem}
+ label{display:block;margin:.5rem 0 .2rem} button{padding:.4rem 1rem}
+ #log{white-space:pre-wrap;border:1px dashed #aaa;padding:.6rem;margin-top:1rem}
+</style>
+
+<!-- Near browser bundle (adds window.nearApi) -->
+<script src="https://unpkg.com/near-api-js@1.5.4/dist/near-api-js.min.js"></script>
+
+<script type="module">
+/* ───────── bring the global into module scope ───────── */
+const nearApi = window.nearApi;
+
+/* ───────── constants (edit if needed) ───────── */
+const CONTRACT  = 'cj4.testnet';
+const NETWORK   = 'testnet';
+const NODE_URL  = `https://rpc.${NETWORK}.near.org`;
+const WALLET_URL= `https://wallet.${NETWORK}.near.org`;
+
+let near, wallet, account;
+async function initNear() {
+  if (wallet) return;
+  near = await nearApi.connect({
+    networkId: NETWORK,
+    nodeUrl : NODE_URL,
+    walletUrl: WALLET_URL,
+    deps: { keyStore: new nearApi.keyStores.BrowserLocalStorageKeyStore() }
+  });
+  wallet  = new nearApi.WalletConnection(near);
+  account = wallet.account();
+}
+
+/* ───────── SHA-256 helper via Web-Crypto ───────── */
+async function sha256Hex(blob){
+  const ab   = await blob.arrayBuffer();
+  const hash = await crypto.subtle.digest('SHA-256', ab);
+  return [...new Uint8Array(hash)]
+         .map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ───────── tiny logger ───────── */
+function log(msg){ document.querySelector('#log').textContent += msg+'\n'; }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const $ = s=>document.querySelector(s);
+
+  /* connect wallet */
+  $('#connect').onclick = async ()=>{
+    await initNear();
+    if(!wallet.isSignedIn()){
+      wallet.requestSignIn({ contractId: CONTRACT });
+    }else{
+      $('#status').textContent = `Wallet: ${account.accountId}`;
+      $('#auth').style.display='none';
+      $('#panels').style.display='block';
+    }
+  };
+
+  /* anchor */
+  $('#anchor-btn').onclick = async ()=>{
+    const file=$('#anchor-file').files[0];
+    if(!file) return log('Pick a file first.');
+    const hex = await sha256Hex(file);
+    log(`local SHA-256: ${hex}`);
+
+    await initNear();
+    const out = await account.functionCall({
+      contractId:CONTRACT,
+      methodName:'record_hash',
+      args:{hash:hex},
+      gas:'30000000000000'
+    });
+    const id64 = out.status.SuccessValue||'';
+    const id   = id64? JSON.parse(atob(id64)) : '(unknown)';
+    log(`✅ stored id = ${id}`);
+  };
+
+  /* verify */
+  $('#verify-btn').onclick = async ()=>{
+    const file=$('#verify-file').files[0];
+    const id=$('#verify-id').value.trim();
+    if(!file||!id) return log('Provide both ID and file.');
+
+    const hex = await sha256Hex(file);
+    log(`local SHA-256: ${hex}`);
+
+    const provider=new nearApi.providers.JsonRpcProvider({url:NODE_URL});
+    const res=await provider.query({
+      request_type:'call_function',
+      account_id: CONTRACT,
+      method_name:'get_hash',
+      args_base64:btoa(JSON.stringify({id})),
+      finality:'optimistic'
+    });
+    const stored = JSON.parse(new TextDecoder().decode(res.result));
+    log(`on-chain hash: ${stored}`);
+    log(stored===hex ? '🎉 MATCH' : '❌ MISMATCH');
+  };
+});
+</script>
+
+<body>
+<h1>Hash-Registry GUI</h1>
+
+<section id="auth">
+  <button id="connect">Connect Wallet</button>
+  <span id="status"></span>
+</section>
+
+<section id="panels" style="display:none">
+  <fieldset>
+    <legend><strong>1. Anchor new hash</strong></legend>
+    <label>Pick image (any file)</label>
+    <input type="file" id="anchor-file" accept="*/*">
+    <button id="anchor-btn">Anchor hash</button>
+  </fieldset>
+
+  <fieldset>
+    <legend><strong>2. Verify existing hash</strong></legend>
+    <label>ID on chain</label>
+    <input type="text" id="verify-id" placeholder="e.g. 3">
+    <label>Original file</label>
+    <input type="file" id="verify-file"  accept="*/*">
+    <button id="verify-btn">Verify</button>
+  </fieldset>
+</section>
+
+<pre id="log"></pre>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    /* emit */
+    "rootDir": ".",          // compile cli/** *and* src/**
+    "outDir":  "dist",
+
+    /* module settings */
+    "target": "ES2020",
+    "module": "es2020",
+    "moduleResolution": "node",
+
+    /* tooling */
+    "types": ["node"],
+    "esModuleInterop": true,
+
+    /* ✅ enable decorator support */
+    "experimentalDecorators": true,
+
+    /* safety / perf */
+    "strict": true,
+    "skipLibCheck": true
+  },
+
+  "include": [
+    "cli/**/*.ts",
+    "src/**/*.ts",   // compiler now sees index.ts, contract.ts, etc.
+    "ambient.d.ts"   // stub for `blake3`
+  ]
+}
